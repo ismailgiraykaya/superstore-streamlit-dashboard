@@ -75,9 +75,15 @@ left, right = st.columns(2)
 
 with left:
     st.subheader("Sales Over Time")
-    sales_daily = (dff.groupby(dff["Order Date"].dt.date)["Sales"].sum().reset_index()
-                   .rename(columns={"Order Date": "Date", "Sales": "Sales"}))
-    fig = px.line(sales_daily, x="Order Date", y="Sales", markers=True)
+    sales_daily = (dff.groupby(dff["Order Date"].dt.date)["Sales"]
+               .sum()
+               .reset_index()
+               .rename(columns={"Order Date": "Date"}))
+
+sales_daily["Date"] = pd.to_datetime(sales_daily["Date"])
+
+fig = px.line(sales_daily, x="Date", y="Sales", markers=True)
+
     fig.update_layout(xaxis_title="Date", yaxis_title="Sales")
     st.plotly_chart(fig, use_container_width=True)
 
