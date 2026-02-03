@@ -10,15 +10,12 @@ st.set_page_config(page_title="E-Commerce Dashboard (Superstore)", layout="wide"
 def load_data(path: str) -> pd.DataFrame:
     df = pd.read_csv(path, encoding="latin1")
 
-    # Date parsing
     if "Order Date" in df.columns:
         df["Order Date"] = pd.to_datetime(df["Order Date"], errors="coerce")
+        df = df.dropna(subset=["Order Date"])
+
     if "Ship Date" in df.columns:
         df["Ship Date"] = pd.to_datetime(df["Ship Date"], errors="coerce")
-
-    # Drop invalid dates
-    if "Order Date" in df.columns:
-        df = df.dropna(subset=["Order Date"])
 
     return df
 
@@ -31,7 +28,6 @@ st.caption("Filters + KPIs + Trends + Product/Region/Category analysis")
 DATA_PATH = "data/superstore.csv"
 df = load_data(DATA_PATH)
 
-# Basic column sanity check
 required_cols = ["Order Date", "Sales", "Profit"]
 missing = [c for c in required_cols if c not in df.columns]
 if missing:
@@ -52,7 +48,9 @@ else:
 
 
 def multiselect_filter(label: str, col: str):
-    opts = sorted([x for x in df[col].dropna().unique()]) if col in df.columns else []
+    if col not in df.columns:
+        return []
+    opts = sorted([x for x in df[col].dropna().unique()])
     return st.sidebar.multiselect(label, opts, default=opts)
 
 
@@ -61,7 +59,6 @@ categories = multiselect_filter("Category", "Category") if "Category" in df.colu
 segments = multiselect_filter("Segment", "Segment") if "Segment" in df.columns else []
 ship_modes = multiselect_filter("Ship Mode", "Ship Mode") if "Ship Mode" in df.columns else []
 
-# Apply filters
 dff = df[
     (df["Order Date"].dt.date >= start_date) &
     (df["Order Date"].dt.date <= end_date)
@@ -77,8 +74,8 @@ if "Ship Mode" in dff.columns and ship_modes:
     dff = dff[dff["Ship Mode"].isin(ship_modes)]
 
 # ---------- KPIs ----------
-total_sales = float(dff["Sales"].sum()) if "Sales" in dff.columns else 0.0
-total_profit = float(dff["Profit"].sum()) if "Profit" in dff.columns else 0.0
+total_sales = float(dff["Sales"].sum())
+total_profit = float(dff["Profit"].sum())
 total_orders = int(dff["Order ID"].nunique()) if "Order ID" in dff.columns else 0
 avg_discount = float(dff["Discount"].mean()) if "Discount" in dff.columns else 0.0
 
@@ -90,7 +87,7 @@ c4.metric("🏷️ Avg Discount", f"{avg_discount:.2%}")
 
 st.divider()
 
-# ---------- Row 1: Sales over time / Monthly Profit ----------
+# ---------- Row 1 ----------
 left, right = st.columns(2)
 
 with left:
@@ -118,7 +115,7 @@ with right:
         .reset_index()
     )
 
-    # Make column names stable (sometimes reset_index returns 'index')
+    # Stabilize column names
     profit_month.columns = ["Date", "Profit"]
     profit_month["Date"] = pd.to_datetime(profit_month["Date"])
 
@@ -128,7 +125,7 @@ with right:
 
 st.divider()
 
-# ---------- Row 2: Category Sales / Profit by Category ----------
+# ---------- Row 2 ----------
 left, right = st.columns(2)
 
 with left:
@@ -161,7 +158,7 @@ with right:
 
 st.divider()
 
-# ---------- Row 3: Region Sales/Profit + Discount vs Profit ----------
+# ---------- Row 3 ----------
 left, right = st.columns(2)
 
 with left:
@@ -180,20 +177,16 @@ with left:
 
 with right:
     st.subheader("Discount vs Profit")
-    if ("Discount" in dff.columns) and ("Profit" in dff.columns):
-        hover_cols = []
-        for c in ["Category", "Sub-Category", "Region", "Segment"]:
-            if c in dff.columns:
-                hover_cols.append(c)
-
+    if "Discount" in dff.columns and "Profit" in dff.columns:
+        hover_cols = [c for c in ["Category", "Sub-Category", "Region", "Segment"] if c in dff.columns]
         fig = px.scatter(dff, x="Discount", y="Profit", hover_data=hover_cols if hover_cols else None)
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Discount/Profit columns not found in dataset.")
+        st.info("Discount/Profit columns not found.")
 
 st.divider()
 
-# ---------- Row 4: Top Products ----------
+# ---------- Row 4 ----------
 st.subheader("Top 10 Products (Sales / Profit)")
 
 if "Product Name" in dff.columns:
@@ -222,12 +215,12 @@ if "Product Name" in dff.columns:
         fig = px.bar(top_profit.sort_values("Profit"), x="Profit", y="Product Name", orientation="h")
         st.plotly_chart(fig, use_container_width=True)
 else:
-    st.info("Product Name column not found, skipping top products section.")
+    st.info("Product Name column not found.")
 
 st.divider()
 
-# ---------- Optional: Sales by State table ----------
-if all(col in dff.columns for col in ["State", "Sales"]):
+# ---------- Optional table ----------
+if "State" in dff.columns:
     st.subheader("Sales by State (table)")
     state_sales = (
         dff.groupby("State")["Sales"]
