@@ -91,7 +91,8 @@ with right:
     st.subheader("Monthly Profit Trend")
     # Notebook: resample ME
     profit_month = (dff.set_index("Order Date")["Profit"].resample("M").sum().reset_index())
-    fig = px.line(profit_month, x="Order Date", y="Profit", markers=True)
+profit_month.columns = ["Date", "Profit"]
+fig = px.line(profit_month, x="Date", y="Profit", markers=True)
     fig.update_layout(xaxis_title="Month", yaxis_title="Profit")
     st.plotly_chart(fig, use_container_width=True)
 
